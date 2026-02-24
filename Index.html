@@ -1,1 +1,114 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chiang Mai Performance Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 20px; }
+    </style>
+</head>
+<body class="p-6">
 
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">📊 Dashboard ผลการดำเนินงานจังหวัดเชียงใหม่</h1>
+            <p class="text-gray-500 mt-2">ดึงข้อมูลแบบ Real-time จาก Google Sheets</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">📍 Heat map ความเข้มข้นของ KPI ตามอำเภอ</h2>
+                <div id="heatmap" style="width: 100%; height: 400px;"></div>
+                <p class="text-xs text-gray-400 mt-2">* ขนาดและสีของกล่องแสดงถึงระดับของ KPI</p>
+            </div>
+
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">📈 สรุป KPI รายอำเภอ (จัดอันดับ)</h2>
+                <div id="barchart" style="width: 100%; height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        //https://script.google.com/macros/s/AKfycbyzxaFWvHG6p1_QC-Rs5FEvzS194YrOqLJ-LXSHpkLxthajX1fSqDx7lhP4vQfdV3lh/exec
+        const API_URL = 'ใส่_URL_WEB_APP_ที่ได้จาก_APPS_SCRIPT_ที่นี่';
+
+        async function fetchData() {
+            try {
+                // ดึงข้อมูลจาก Google Sheet
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                renderCharts(data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                alert('ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบ URL ของ Web App');
+            }
+        }
+
+        function renderCharts(data) {
+            // เตรียมข้อมูลสำหรับ Treemap (ทำหน้าที่คล้าย Heatmap เชิงสถิติ)
+            const treeMapData = data.map(item => ({
+                name: item['อำเภอ'],
+                value: item['KPI']
+            }));
+
+            // เตรียมข้อมูลสำหรับ Bar Chart (เรียงลำดับ KPI จากมากไปน้อย)
+            const sortedData = [...data].sort((a, b) => b['KPI'] - a['KPI']);
+            const districts = sortedData.map(item => item['อำเภอ']);
+            const kpis = sortedData.map(item => item['KPI']);
+
+            /* --- สร้าง Heatmap (Treemap) --- */
+            const heatmapChart = echarts.init(document.getElementById('heatmap'));
+            heatmapChart.setOption({
+                tooltip: { formatter: '{b}: KPI = {c}' },
+                series: [{
+                    type: 'treemap',
+                    data: treeMapData,
+                    roam: false,
+                    label: { show: true, formatter: '{b}\n\n{c}' },
+                    levels: [
+                        {
+                            itemStyle: { borderWidth: 2, borderColor: '#fff' },
+                            colorMappingBy: 'value',
+                            color: ['#fecaca', '#f87171', '#ef4444', '#b91c1c'] // โทนสีแดง Heatmap
+                        }
+                    ]
+                }]
+            });
+
+            /* --- สร้าง Bar Chart --- */
+            const barChart = echarts.init(document.getElementById('barchart'));
+            barChart.setOption({
+                tooltip: { trigger: 'axis' },
+                grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                xAxis: { type: 'value' },
+                yAxis: { type: 'category', data: districts.reverse() }, // เรียงจากล่างขึ้นบน
+                series: [{
+                    name: 'KPI',
+                    type: 'bar',
+                    data: kpis.reverse(),
+                    itemStyle: { color: '#3b82f6' } // สีฟ้า
+                }]
+            });
+
+            // ทำให้กราฟยืดหยุ่นตามขนาดหน้าจอ
+            window.addEventListener('resize', () => {
+                heatmapChart.resize();
+                barChart.resize();
+            });
+        }
+
+        // เรียกใช้งานฟังก์ชันเมื่อเปิดหน้าเว็บ
+        if(API_URL !== 'ใส่_URL_WEB_APP_ที่ได้จาก_APPS_SCRIPT_ที่นี่'){
+            fetchData();
+        } else {
+            console.log("โปรดใส่ API URL จาก Apps Script ก่อน");
+        }
+    </script>
+</body>
+</html>
