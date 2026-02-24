@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chiang Mai Performance Dashboard</title>
+    <title>Dashboard แผนปฏิบัติราชการ เชียงใหม่ 2568</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
@@ -16,53 +16,60 @@
 
     <div class="max-w-7xl mx-auto">
         <header class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-800">📊 Dashboard ผลการดำเนินงานจังหวัดเชียงใหม่</h1>
-            <p class="text-gray-500 mt-2">ดึงข้อมูลแบบ Real-time จาก Google Sheets</p>
+            <h1 class="text-3xl font-bold text-gray-800">📊 Dashboard ติดตามแผนปฏิบัติราชการประจำปี 2568 จังหวัดเชียงใหม่</h1>
+            <p class="text-gray-500 mt-2">ดึงข้อมูลสถานะแบบ Real-time จากระบบฐานข้อมูล</p>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="card">
                 <h2 class="text-xl font-semibold mb-4 text-gray-700">📍 Heat map ความเข้มข้นของ KPI ตามอำเภอ</h2>
                 <div id="heatmap" style="width: 100%; height: 400px;"></div>
-                <p class="text-xs text-gray-400 mt-2">* ขนาดและสีของกล่องแสดงถึงระดับของ KPI</p>
+                <p class="text-xs text-gray-400 mt-2">* ขนาดและโทนสีแดงแสดงถึงระดับของ KPI</p>
             </div>
 
             <div class="card">
-                <h2 class="text-xl font-semibold mb-4 text-gray-700">📈 สรุป KPI รายอำเภอ (จัดอันดับ)</h2>
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">📈 สรุป KPI รายอำเภอ</h2>
                 <div id="barchart" style="width: 100%; height: 400px;"></div>
             </div>
         </div>
     </div>
 
     <script>
-        //https://script.google.com/macros/s/AKfycbyzxaFWvHG6p1_QC-Rs5FEvzS194YrOqLJ-LXSHpkLxthajX1fSqDx7lhP4vQfdV3lh/exec
-        const API_URL = 'ใส่_URL_WEB_APP_ที่ได้จาก_APPS_SCRIPT_ที่นี่';
+        //'https://script.google.com/macros/s/AKfycbz_SWNf7FUDbdqDeFbj_sd-8yOUxQewleyHry9ClgZJn8G6a7dCyil-kyOqDKcWBclqgA/exec'
+        const API_URL = 'https://script.google.com/macros/s/AKfycbz_SWNf7FUDbdqDeFbj_sd-8yOUxQewleyHry9ClgZJn8G6a7dCyil-kyOqDKcWBclqgA/exec';
 
         async function fetchData() {
             try {
-                // ดึงข้อมูลจาก Google Sheet
-                const response = await fetch(API_URL);
+                // คำสั่งดึงข้อมูลทะลุกำแพงของ Google
+                const response = await fetch(API_URL, { redirect: "follow" });
+                if (!response.ok) throw new Error('Network response was not ok');
+                
                 const data = await response.json();
+                
+                if(data.error) {
+                    alert("พบปัญหาจาก Google Sheet: " + data.error);
+                    return;
+                }
+                
                 renderCharts(data);
             } catch (error) {
                 console.error('Error fetching data:', error);
-                alert('ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบ URL ของ Web App');
+                alert('ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบว่าใส่ URL ถูกต้องหรือไม่');
             }
         }
 
         function renderCharts(data) {
-            // เตรียมข้อมูลสำหรับ Treemap (ทำหน้าที่คล้าย Heatmap เชิงสถิติ)
+            // จับคู่ข้อมูลให้เข้ากับคอลัมน์ใน Excel ของคุณ (อำเภอ และ KPI)
             const treeMapData = data.map(item => ({
                 name: item['อำเภอ'],
-                value: item['KPI']
+                value: item['KPI'] || 0
             }));
 
-            // เตรียมข้อมูลสำหรับ Bar Chart (เรียงลำดับ KPI จากมากไปน้อย)
-            const sortedData = [...data].sort((a, b) => b['KPI'] - a['KPI']);
+            const sortedData = [...data].sort((a, b) => (b['KPI'] || 0) - (a['KPI'] || 0));
             const districts = sortedData.map(item => item['อำเภอ']);
-            const kpis = sortedData.map(item => item['KPI']);
+            const kpis = sortedData.map(item => item['KPI'] || 0);
 
-            /* --- สร้าง Heatmap (Treemap) --- */
+            // วาด Heatmap (Treemap)
             const heatmapChart = echarts.init(document.getElementById('heatmap'));
             heatmapChart.setOption({
                 tooltip: { formatter: '{b}: KPI = {c}' },
@@ -71,43 +78,40 @@
                     data: treeMapData,
                     roam: false,
                     label: { show: true, formatter: '{b}\n\n{c}' },
-                    levels: [
-                        {
-                            itemStyle: { borderWidth: 2, borderColor: '#fff' },
-                            colorMappingBy: 'value',
-                            color: ['#fecaca', '#f87171', '#ef4444', '#b91c1c'] // โทนสีแดง Heatmap
-                        }
-                    ]
+                    levels: [{
+                        itemStyle: { borderWidth: 2, borderColor: '#fff' },
+                        colorMappingBy: 'value',
+                        color: ['#fecaca', '#f87171', '#ef4444', '#b91c1c']
+                    }]
                 }]
             });
 
-            /* --- สร้าง Bar Chart --- */
+            // วาดกราฟแท่ง
             const barChart = echarts.init(document.getElementById('barchart'));
             barChart.setOption({
                 tooltip: { trigger: 'axis' },
                 grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
                 xAxis: { type: 'value' },
-                yAxis: { type: 'category', data: districts.reverse() }, // เรียงจากล่างขึ้นบน
+                yAxis: { type: 'category', data: districts.reverse() },
                 series: [{
                     name: 'KPI',
                     type: 'bar',
                     data: kpis.reverse(),
-                    itemStyle: { color: '#3b82f6' } // สีฟ้า
+                    itemStyle: { color: '#3b82f6' }
                 }]
             });
 
-            // ทำให้กราฟยืดหยุ่นตามขนาดหน้าจอ
             window.addEventListener('resize', () => {
                 heatmapChart.resize();
                 barChart.resize();
             });
         }
 
-        // เรียกใช้งานฟังก์ชันเมื่อเปิดหน้าเว็บ
-        if(API_URL !== 'ใส่_URL_WEB_APP_ที่ได้จาก_APPS_SCRIPT_ที่นี่'){
+        // เริ่มดึงข้อมูลทันทีเมื่อเปิดเว็บ
+        if(API_URL !== 'เอา_URL_มาวางตรงนี้'){
             fetchData();
         } else {
-            console.log("โปรดใส่ API URL จาก Apps Script ก่อน");
+            alert("โปรดนำ URL จาก Apps Script มาใส่ในไฟล์ index.html ก่อนครับ");
         }
     </script>
 </body>
